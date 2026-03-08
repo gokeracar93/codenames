@@ -2,49 +2,49 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Codenames Spymaster Camera</title>
+<title>Codenames Spymaster Helper</title>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <style>
-
 body{
-font-family:Arial;
-text-align:center;
-background:#f2f2f2;
-margin:20px;
+  font-family:Arial;
+  text-align:center;
+  background:#f2f2f2;
+  margin:20px;
 }
 
 button{
-padding:12px 20px;
-margin:10px;
-font-size:16px;
+  padding:12px 20px;
+  margin:10px;
+  font-size:16px;
 }
 
 .grid{
-display:grid;
-grid-template-columns:repeat(5,1fr);
-gap:8px;
-margin-top:20px;
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:8px;
+  margin-top:20px;
 }
 
 .card{
-padding:18px;
-font-weight:bold;
-border-radius:6px;
+  padding:18px;
+  font-weight:bold;
+  border-radius:6px;
+  text-align:center;
 }
 
 .red{background:#e74c3c;color:white;}
 .blue{background:#3498db;color:white;}
-.neutral{background:#f1c40f;}
+.neutral{background:#f1c40f;color:black;}
 .black{background:black;color:white;}
 
 video{
-width:90%;
-max-width:400px;
-border-radius:10px;
+  width:90%;
+  max-width:400px;
+  border-radius:10px;
+  margin-top:10px;
 }
-
 </style>
 </head>
 
@@ -58,9 +58,7 @@ border-radius:10px;
 <p>2️⃣ Renk kartını çek</p>
 <button onclick="startCamera('colors')">Renk Fotoğrafı</button>
 
-<br>
-
-<video id="camera" autoplay></video>
+<video id="camera" autoplay playsinline></video>
 <br>
 <button onclick="takePhoto()">Fotoğraf Çek</button>
 
@@ -69,110 +67,83 @@ border-radius:10px;
 <div class="grid" id="board"></div>
 
 <script>
-
 let mode=""
 let words=[]
 let colors=[]
 
 function startCamera(type){
-mode=type
-navigator.mediaDevices.getUserMedia({video:true})
-.then(stream=>{
-document.getElementById("camera").srcObject=stream
-})
+  mode = type;
+  navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}})
+  .then(stream => {
+      document.getElementById("camera").srcObject = stream;
+  })
+  .catch(err => {
+      alert("Kamera açılamadı: " + err);
+  });
 }
 
 function takePhoto(){
+  const video=document.getElementById("camera");
+  const canvas=document.getElementById("canvas");
+  const ctx=canvas.getContext("2d");
 
-const video=document.getElementById("camera")
-const canvas=document.getElementById("canvas")
-const ctx=canvas.getContext("2d")
+  canvas.width=video.videoWidth;
+  canvas.height=video.videoHeight;
 
-canvas.width=video.videoWidth
-canvas.height=video.videoHeight
+  ctx.drawImage(video,0,0);
 
-ctx.drawImage(video,0,0)
+  const image=canvas.toDataURL("image/png");
 
-const image=canvas.toDataURL("image/png")
-
-if(mode==="words"){
-readWords(image)
-}
-
-if(mode==="colors"){
-detectColors(canvas)
-}
-
+  if(mode==="words"){
+    readWords(image);
+  } else if(mode==="colors"){
+    detectColors(canvas);
+  }
 }
 
 async function readWords(img){
-
-const result=await Tesseract.recognize(img,'eng')
-
-words=result.data.text
-.split("\n")
-.map(w=>w.trim())
-.filter(w=>w.length>1)
-.slice(0,25)
-
-alert("25 kelime algılandı")
-
+  const result=await Tesseract.recognize(img,'eng');
+  words=result.data.text
+    .split("\n")
+    .map(w=>w.trim())
+    .filter(w=>w.length>1)
+    .slice(0,25);
+  alert("25 kelime algılandı!");
 }
 
 function detectColors(canvas){
+  const ctx=canvas.getContext("2d");
+  const w=canvas.width/5;
+  const h=canvas.height/5;
+  colors=[];
 
-const ctx=canvas.getContext("2d")
+  for(let y=0;y<5;y++){
+    for(let x=0;x<5;x++){
+      let data=ctx.getImageData(x*w,y*h,10,10).data;
+      let r=data[0], g=data[1], b=data[2];
+      let color="neutral";
 
-const w=canvas.width/5
-const h=canvas.height/5
+      if(r>180 && g<100 && b<100) color="red";
+      else if(b>150 && r<120) color="blue";
+      else if(r<80 && g<80 && b<80) color="black";
 
-colors=[]
-
-for(let y=0;y<5;y++){
-
-for(let x=0;x<5;x++){
-
-let data=ctx.getImageData(x*w,y*h,10,10).data
-
-let r=data[0]
-let g=data[1]
-let b=data[2]
-
-let color="neutral"
-
-if(r>180 && g<100 && b<100) color="red"
-else if(b>150 && r<120) color="blue"
-else if(r<80 && g<80 && b<80) color="black"
-
-colors.push(color)
-
-}
-
-}
-
-renderBoard()
-
+      colors.push(color);
+    }
+  }
+  renderBoard();
 }
 
 function renderBoard(){
+  const board=document.getElementById("board");
+  board.innerHTML="";
 
-let board=document.getElementById("board")
-board.innerHTML=""
-
-for(let i=0;i<25;i++){
-
-let div=document.createElement("div")
-
-div.className="card "+(colors[i]||"neutral")
-
-div.innerText=words[i]||"?"
-
-board.appendChild(div)
-
+  for(let i=0;i<25;i++){
+    const div=document.createElement("div");
+    div.className="card "+(colors[i]||"neutral");
+    div.innerText=words[i]||"?";
+    board.appendChild(div);
+  }
 }
-
-}
-
 </script>
 
 </body>
